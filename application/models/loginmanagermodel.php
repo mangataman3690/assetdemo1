@@ -9,8 +9,8 @@ class LoginManagerModel extends CI_Model
 
     function validateUser()
     {  
-        $userName = mysql_real_escape_string($this -> input -> post('u_name'));
-			$userPassword = mysql_real_escape_string($this -> input -> post('u_password'));
+        $userName = $this -> commonlib -> cleanData($this -> input -> post('u_name'));
+			$userPassword = $this -> commonlib -> cleanData($this -> input -> post('u_password'));
 
 			$query="select userId, userName from users where userName = '" . trim($userName) . "' AND userPassword= '" . trim(MD5($userPassword)) . "' and active=1";
         $execQuery=$this->db->query($query);
@@ -27,7 +27,7 @@ class LoginManagerModel extends CI_Model
 
     function saveLoginAccess($userId,$deviceInfo=""){
 
-      $deviceInfo = mysql_real_escape_string($deviceInfo);
+      $deviceInfo = $this -> commonlib -> cleanData($deviceInfo);
       $dateTime=date("Y-m-d H:i:s");
       $query="INSERT into user_login_track(
                 `userId`,

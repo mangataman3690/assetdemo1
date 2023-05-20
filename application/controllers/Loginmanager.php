@@ -8,46 +8,57 @@ class Loginmanager extends CI_Controller {
         parent::__construct();
         
         $this -> load -> helper("url");
+        $this -> load -> library("commonlib");
         $this->load->model("loginmanagermodel");
         
      }
 
 	public function index()
 	{
-
 		$this->load->view('loginmanagerview');
 	}
 
 	function checklogin(){
-		// print_r($_POST);
+		unset($_SESSION['userId']);
 
-		$data="";
+		$data=array();
 
-		$username = mysql_real_escape_string($this -> input -> post('u_name'));
-		$password = mysql_real_escape_string($this -> input -> post('u_password'));
+		$username = $this -> commonlib -> cleanData($this -> input -> post('u_name'));
+		$password = $this -> commonlib -> cleanData($this -> input -> post('u_password'));
 		
 		if (trim($username) == "") {
-			$data = "Error|Please enter a valid username";
+			$data['status']  = "Error";
+			$data['errorMsg']  = "Please enter a valid username";
 
 		}
 		if (trim($password) == "") {
-			$data = "Error|Please enter a valid password";
+			$data['status']  = "Error";
+			$data['errorMsg']  ="Please enter a valid password";
 
 		}
-		if($data!=""){
-			return $data;
+		if(isset($data['status'])){
+			echo json_encode($data);
 
 		}
 		$resultSet=$this->loginmanagermodel->validateUser();
 		if(is_array($resultSet) && isset($resultSet[0])){
-			$data = "Success|";
+			$_SESSION['userId']=$resultSet[0]['userId'];
+			$_SESSION['userName']=$resultSet[0]['userName'];
+		 	$data['status'] = "Success";
+			$data['successMsg']  ="";
 			$this->loginmanagermodel->saveLoginAccess($resultSet[0]['userId']);
 
 		} else {
-			$data = "Error|Invalid Username/Password combination or Account Inactive";
+			$data['status']  = "Error";
+			$data['errorMsg']  ="Invalid Username/Password combination or Account Inactive";
 
 		}
-		return $data;
+		echo json_encode($data);
 
 	}
+
+	function logout(){
+		session_destroy();
+	}
+
 }

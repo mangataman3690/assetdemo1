@@ -1,2 +1,0 @@
-# assetdemo1
- 

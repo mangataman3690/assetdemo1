@@ -15,9 +15,10 @@ class Assetmanagermodel extends CI_Model
     	$viewStr = "concat('<a onclick=viewRecord(',assetId,'); href=\"#\">View</a>')";
     	$editStr = "concat('<a onclick=editRecord(',assetId,'); href=\"#\">Edit</a>')";
     	$deleteStr = "concat('<a onclick=deleteRecord(',assetId,'); href=\"#\">Delete</a>')";
+    	$mapStr = "concat('<a onclick=mapRecord(',assetId,'); href=\"#\">Map User</a>')";
 
     		
-    		$actionStr = " concat('<nobr> ', $viewStr, $editStr, $deleteStr , '</nobr>') as action ";
+    		$actionStr = " concat( $viewStr,' ', $editStr,' ', $deleteStr,' ', $mapStr,' ') as action ";
 
         
         $searchQuery=$this->getSearchTermsQuery();
@@ -28,7 +29,7 @@ class Assetmanagermodel extends CI_Model
 									  `installationYear` ,
 									  `expectedUsefulLife` ,
 									  `renewalYear` ,
-									  `condition` ,
+									  `assetCondition` ,
 									  `quantity` ,
 									  `unitCost` ,
   									`estimatedCost`,
@@ -50,7 +51,7 @@ class Assetmanagermodel extends CI_Model
     		$searchString = 0;
         if($this->input->post('searchbox') !="")
         {
-          $searchString = trim(mysql_real_escape_string($this->input->post('searchbox'))) ;
+          $searchString = $this -> commonlib -> cleanData($this->input->post('searchbox')) ;
 
         }
         
@@ -81,7 +82,7 @@ class Assetmanagermodel extends CI_Model
 									  `installationYear` ,
 									  `expectedUsefulLife` ,
 									  `renewalYear` ,
-									  `condition` ,
+									  `assetCondition` ,
 									  `quantity` ,
 									  `unitCost` ,
   									`estimatedCost`
@@ -115,6 +116,25 @@ class Assetmanagermodel extends CI_Model
 		$unitCost = $this -> commonlib -> cleanData($this -> input -> post('a_unitcost'));
 		$estimatedCost = $this -> commonlib -> cleanData($this -> input -> post('a_estimatedcost'));
 
+		if($installationYear==""){
+			$installationYear=0;
+		}
+		if($expectedUsefulLife==""){
+			$expectedUsefulLife=0;
+		}
+		if($renewalYear==""){
+			$renewalYear=0;
+		}
+		if($quantity==""){
+			$quantity=0;
+		}
+		if($unitCost==""){
+			$unitCost=0;
+		}
+		if($estimatedCost==""){
+			$estimatedCost=0;
+		}
+
 		$this->db->trans_begin();
 
 		$query = "INSERT INTO assets(
@@ -123,7 +143,7 @@ class Assetmanagermodel extends CI_Model
 						  `installationYear` ,
 						  `expectedUsefulLife` ,
 						  `renewalYear` ,
-						  `condition` ,
+						  `assetCondition` ,
 						  `quantity` ,
 						  `unitCost`,
 						  `estimatedCost` )
@@ -156,6 +176,34 @@ class Assetmanagermodel extends CI_Model
 		$unitCost = $this -> commonlib -> cleanData($this -> input -> post('e_unitcost'));
 		$estimatedCost = $this -> commonlib -> cleanData($this -> input -> post('e_estimatedcost'));
 
+		if($installationYear==""){
+			$installationYear=0;
+		}
+		if($expectedUsefulLife==""){
+			$expectedUsefulLife=0;
+		}
+		if($renewalYear==""){
+			$renewalYear=0;
+		}
+		if($quantity==""){
+			$quantity=0;
+		}
+		if($unitCost==""){
+			$unitCost=0;
+		}
+		if($estimatedCost==""){
+			$estimatedCost=0;
+		}
+
+		$oldResult = $this->view($assetId);
+		$publishHistory=0;
+		$changeHistoryStr="";
+		if($assetName!=$oldResult[0]['assetName']){
+			$publishHistory=1;
+			$changeHistoryStr.=" changed assetName from ".$oldResult[0]['assetName']." to ".$assetName." on ".date("d-m-Y H:i:s")."<br><br>";
+
+		}
+
 		$this->db->trans_begin();
 
 		$query = "UPDATE assets SET 
@@ -164,7 +212,7 @@ class Assetmanagermodel extends CI_Model
 						  installationYear = $installationYear,
 						  expectedUsefulLife = '$expectedUsefulLife',
 						  renewalYear = $renewalYear,
-						  condition = '$condition',
+						  assetCondition = '$condition',
 						  quantity = $quantity,
 						  unitCost = '$unitCost',
 						  estimatedCost = '$estimatedCost' 
@@ -179,7 +227,9 @@ class Assetmanagermodel extends CI_Model
 				$this -> db -> trans_commit();	
 				// log queries here if protocol requires		
 				// save history here as well
-				$this -> save_history();
+				if($publishHistory==1){
+					$this -> save_history($assetId,$_SESSION['userId'],$changeHistoryStr);
+				}
 				return 1; // return $assetId if required
 			}
 		
@@ -205,15 +255,71 @@ class Assetmanagermodel extends CI_Model
 			} else {
 				$this -> db -> trans_commit();	
 				// log queries here if protocol requires		
-				// save history here as well
-				$this -> save_history("Delete");
+				// save history here as well 
 				return 1; // return $assetId if required
 			}
 		
 	}
 
-	function save_history(){
+	function save_history($assetId,$userId,$str){
 
+		$query="INSERT INTO asset_history (assetId,userId,changeHistory) values (".$assetId.",".$userId.",'".$_SESSION['userName'].$str."')";
+		$this->db->query($query);
+
+	}
+	function showhistory(){
+
+		$query="SELECT changeHistory from asset_history ";
+		$execQuery=$this->db->query($query);
+		$data = array();
+		$str="";
+
+				if($execQuery !== FALSE && $execQuery->num_rows() > 0){
+				    foreach ($execQuery->result_array() as $row) {
+				        $str.= $row['changeHistory'];
+				    }
+				}
+		$data['str']=$str;
+
+        return $data;
+
+	}
+
+	function fetchuser(){
+
+		$assetId = $this -> commonlib -> cleanData($this -> input -> post('assetId'));
+		$query="select userId,userName from users where userId NOT IN (select userId from asset_user_map) union select aum.userId,u.userName from asset_user_map aum left join users u on aum.userId=u.userId where aum.assetId=".$assetId."";
+		$execQuery=$this->db->query($query);
+		return $execQuery;
+
+	}
+	function fetchselecteduser(){
+
+		$assetId = $this -> commonlib -> cleanData($this -> input -> post('assetId'));
+
+		$query="select userId from asset_user_map WHERE assetId = ".$assetId."
+        ";
+        
+        $res=$this->db->query($query)->result_array();
+        return $res;
+
+	}
+
+	function mapuser(){
+
+		$assetId = $this -> commonlib -> cleanData($this -> input -> post('assetId'));
+		$userId = $this -> commonlib -> cleanData($this -> input -> post('userId'));
+
+		$query="DELETE FROM asset_user_map WHERE assetId =".$assetId;
+		$this->db->query($query);
+
+		if($userId!="" && $userId!=0){
+
+			$query="INSERT INTO asset_user_map (assetId,userId) values (".$assetId.",".$userId.")";
+			$this->db->query($query);
+		}
+
+        return;
 
 	}
 
